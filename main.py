@@ -8,15 +8,20 @@ import shap
 import joblib
 
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 app = FastAPI()
 
-# Serve static folder directly
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+# ✅ Mount static folder properly
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# ✅ Root route
+@app.get("/")
+def root():
+    return RedirectResponse(url="/static/index.html")
 
 MODEL_PATH = "final_binary_pipeline.pkl"
 model = joblib.load(MODEL_PATH) if os.path.exists(MODEL_PATH) else None
@@ -113,12 +118,15 @@ async def websocket_endpoint(websocket: WebSocket):
 async def upload(file: UploadFile = File(...)):
     if model is None:
         return {"error": "Model missing"}
+
     df = pd.read_csv(file.file)
     preds = model.predict(df)
     result = "Intrusion" if sum(preds) > len(preds) / 2 else "Normal"
+
     explainer = shap.Explainer(model)
     shap_values = explainer(df)
     state["shap_data"] = shap_values.values[0].tolist()[:5]
+
     return {"result": result}
 
 @app.get("/api/report")
