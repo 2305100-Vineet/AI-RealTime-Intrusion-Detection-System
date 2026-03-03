@@ -1,25 +1,52 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Header
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import BaseModel
 import joblib
 import numpy as np
 import sqlite3
 import threading
 import time
 import random
-import requests
-from scapy.all import sniff
+import os
 import secrets
+
+# ==============================
+# APP INIT
+# ==============================
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-security = HTTPBasic()
+# Detect Cloud (Render sets PORT automatically)
+CLOUD_MODE = os.getenv("RENDER") == "true"
 
+# ==============================
+# LOGIN CONFIG
+# ==============================
+
+security = HTTPBasic()
 USERNAME = "admin"
 PASSWORD = "soc123"
+
+def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_user = secrets.compare_digest(credentials.username, USERNAME)
+    correct_pass = secrets.compare_digest(credentials.password, PASSWORD)
+    if not (correct_user and correct_pass):
+        raise HTTPException(status_code=401)
+    return credentials.username
+
+@app.get("/")
+def login_page():
+    return FileResponse("static/login.html")
+
+@app.get("/dashboard")
+def dashboard(user: str = Depends(authenticate)):
+    return FileResponse("static/index.html")
+
+# ==============================
+# LOAD MODEL
+# ==============================
 
 binary_pipeline = joblib.load("final_binary_pipeline.pkl")
 
@@ -46,62 +73,37 @@ def init_db():
 init_db()
 
 # ==============================
-# LOGIN
-# ==============================
-
-def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
-    correct_user = secrets.compare_digest(credentials.username, USERNAME)
-    correct_pass = secrets.compare_digest(credentials.password, PASSWORD)
-    if not (correct_user and correct_pass):
-        raise HTTPException(status_code=401)
-    return credentials.username
-
-@app.get("/")
-def login_page():
-    return FileResponse("static/login.html")
-
-@app.get("/dashboard")
-def dashboard(user: str = Depends(authenticate)):
-    return FileResponse("static/index.html")
-
-# ==============================
 # LIVE IDS VARIABLES
 # ==============================
 
 packet_count = 0
 total_packet_size = 0
 live_mode = False
-latest_result = {}
 clients = []
 
 # ==============================
-# PACKET PROCESSING
+# REAL PACKET SNIFFING (LOCAL ONLY)
 # ==============================
 
-def process_packet(packet):
-    global packet_count, total_packet_size
-    packet_count += 1
-    total_packet_size += len(packet)
+if not CLOUD_MODE:
+    from scapy.all import sniff
 
-def sniff_thread():
-    sniff(prn=process_packet, store=False)
+    def process_packet(packet):
+        global packet_count, total_packet_size
+        packet_count += 1
+        total_packet_size += len(packet)
 
-threading.Thread(target=sniff_thread, daemon=True).start()
+    def sniff_thread():
+        sniff(prn=process_packet, store=False)
 
-# ==============================
-# THREAT INTEL API (Simulated)
-# ==============================
-
-def check_threat_intel(ip):
-    # Simulated threat lookup
-    return random.choice([True, False])
+    threading.Thread(target=sniff_thread, daemon=True).start()
 
 # ==============================
 # ANALYZER LOOP (15 sec)
 # ==============================
 
 def analyzer_loop():
-    global packet_count, total_packet_size, latest_result
+    global packet_count, total_packet_size
 
     while True:
         time.sleep(15)
@@ -109,14 +111,19 @@ def analyzer_loop():
         if not live_mode:
             continue
 
-        if packet_count == 0:
-            continue
+        if CLOUD_MODE:
+            packet_sim = random.randint(50, 500)
+            avg_size = random.randint(200, 1500)
+        else:
+            if packet_count == 0:
+                continue
+            packet_sim = packet_count
+            avg_size = total_packet_size / packet_count
 
-        avg_size = total_packet_size / packet_count
+        # 40 feature vector
         features = np.zeros(40)
-        features[0] = packet_count
+        features[0] = packet_sim
         features[1] = avg_size
-
         features = features.reshape(1, -1)
 
         prob = binary_pipeline.predict_proba(features)[0][1]
@@ -130,33 +137,31 @@ def analyzer_loop():
             severity = "Medium"
 
         ip = f"192.168.1.{random.randint(1,255)}"
-        threat_flag = check_threat_intel(ip)
 
-        latest_result = {
+        result = {
             "status": "attack" if is_attack else "safe",
             "risk_score": risk_score,
             "severity": severity,
-            "ip": ip,
-            "threat_intel": threat_flag
+            "ip": ip
         }
 
         # Save to DB
         conn = sqlite3.connect("threat.db")
         c = conn.cursor()
         c.execute("INSERT INTO logs (timestamp,status,risk,severity,ip) VALUES (datetime('now'),?,?,?,?)",
-                  (latest_result["status"], risk_score, severity, ip))
+                  (result["status"], risk_score, severity, ip))
         conn.commit()
         conn.close()
 
-        # reset
+        # Reset counters
         packet_count = 0
         total_packet_size = 0
 
-        # push to websocket clients
+        # Push to WebSocket clients
         for client in clients:
             try:
                 import asyncio
-                asyncio.run(client.send_json(latest_result))
+                asyncio.run(client.send_json(result))
             except:
                 pass
 
@@ -177,7 +182,7 @@ async def websocket_endpoint(websocket: WebSocket):
         clients.remove(websocket)
 
 # ==============================
-# TOGGLE LIVE
+# TOGGLE LIVE MODE
 # ==============================
 
 @app.post("/toggle_live")
