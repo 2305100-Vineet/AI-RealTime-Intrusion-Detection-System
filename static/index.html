@@ -1,85 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>AI IDS - SOC Command Center</title>
-<link rel="stylesheet" href="/static/style.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4.3.0/build/index.umd.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI IDS SOC</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <h1>⚡ AI Intrusion Detection - SOC Command Center</h1>
 
-<div class="top-grid">
+<div class="grid">
 
 <div class="card">
 <h3>Status</h3>
-<p id="status">Waiting...</p>
+<p id="threat">Waiting...</p>
 </div>
 
 <div class="card">
 <h3>Risk Score</h3>
-<div class="risk-bar">
-<div id="riskFill"></div>
+<div class="progress">
+<div id="bar"></div>
 </div>
-<p id="riskPercent">0%</p>
+<p id="risk">0%</p>
 </div>
 
 <div class="card">
-<h3>Traffic Monitor</h3>
-<p id="trafficCounter">0 packets</p>
+<h3>Traffic</h3>
+<p id="traffic">0 packets</p>
 </div>
 
 </div>
 
-<div class="radar-container">
-<div class="radar"></div>
-</div>
-
-<div class="card large">
-<h3>Explainability</h3>
-<pre id="explainBox"></pre>
-</div>
-
-<div class="card large">
-<h3>Live Event Log</h3>
+<div class="section">
+<h2>Live Events</h2>
 <table>
 <thead>
-<tr>
-<th>Time</th>
-<th>Status</th>
-<th>Risk</th>
-<th>Severity</th>
-</tr>
+<tr><th>Time</th><th>Status</th><th>Risk</th><th>Severity</th></tr>
 </thead>
-<tbody id="logTable"></tbody>
+<tbody id="events"></tbody>
 </table>
 </div>
 
-<div class="card large">
-<h3>Global Threat Map</h3>
-<canvas id="worldMap"></canvas>
+<div class="section">
+<h2>Global Threat Map</h2>
+<div id="map"></div>
 </div>
 
-<div class="card large">
-<h3>Activity Heatmap</h3>
-<canvas id="heatmapChart"></canvas>
-</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet/dist/leaflet.css"/>
 
-<div class="controls">
-<label>
-<input type="checkbox" onchange="toggleLive()">
-Live Capture Mode
-</label>
+<script src="script.js"></script>
 
-<button onclick="runPrediction()">Analyze Now</button>
-</div>
-
-<audio id="alertSound">
-<source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">
-</audio>
-
-<script src="/static/script.js"></script>
 </body>
 </html>
