@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>AI IDS - SOC Command Center</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4.3.0/build/index.umd.min.js"></script>
+</head>
+<body>
+
+<h1>⚡ AI Intrusion Detection - SOC Command Center</h1>
+
+<div class="top-grid">
+
+<div class="card">
+<h3>Status</h3>
+<p id="status">Waiting...</p>
+</div>
+
+<div class="card">
+<h3>Risk Score</h3>
+<div class="risk-bar">
+<div id="riskFill"></div>
+</div>
+<p id="riskPercent">0%</p>
+</div>
+
+<div class="card">
+<h3>Traffic Monitor</h3>
+<p id="trafficCounter">0 packets</p>
+</div>
+
+</div>
+
+<div class="radar-container">
+<div class="radar"></div>
+</div>
+
+<div class="card large">
+<h3>Explainability</h3>
+<pre id="explainBox"></pre>
+</div>
+
+<div class="card large">
+<h3>Live Event Log</h3>
+<table>
+<thead>
+<tr>
+<th>Time</th>
+<th>Status</th>
+<th>Risk</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody id="logTable"></tbody>
+</table>
+</div>
+
+<div class="card large">
+<h3>Global Threat Map</h3>
+<canvas id="worldMap"></canvas>
+</div>
+
+<div class="card large">
+<h3>Activity Heatmap</h3>
+<canvas id="heatmapChart"></canvas>
+</div>
+
+<div class="controls">
+<label>
+<input type="checkbox" onchange="toggleLive()">
+Live Capture Mode
+</label>
+
+<button onclick="runPrediction()">Analyze Now</button>
+</div>
+
+<audio id="alertSound">
+<source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">
+</audio>
+
+<script src="/static/script.js"></script>
+</body>
+</html>
