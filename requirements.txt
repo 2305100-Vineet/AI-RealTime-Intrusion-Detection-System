@@ -1,7 +1,5 @@
 fastapi
 uvicorn
-scapy
-joblib
 numpy
-requests
-chartjs-chart-geo
+joblib
+sqlite3
