@@ -1,17 +1,87 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Login - AI SOC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise AI IDS SOC</title>
+
 <link rel="stylesheet" href="/static/style.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet/dist/leaflet.css"/>
 </head>
+
 <body>
-<div class="login-box">
-<h2>AI IDS SOC Login</h2>
-<form action="/login" method="post">
-<input type="text" name="username" placeholder="Username" required>
-<input type="password" name="password" placeholder="Password" required>
-<button type="submit">Login</button>
-</form>
+
+<div class="bg-grid"></div>
+
+<header>
+<h1>⚡ Enterprise AI IDS SOC</h1>
+<button onclick="toggleTheme()">Toggle Theme</button>
+</header>
+
+<div class="radar"></div>
+
+<div class="grid">
+
+<div class="card">
+<h3>Threat Level</h3>
+<p id="threat">Loading...</p>
 </div>
+
+<div class="card">
+<h3>Risk Level</h3>
+<div class="progress">
+<div id="bar"></div>
+</div>
+<p id="risk">0%</p>
+</div>
+
+<div class="card">
+<h3>Network Traffic</h3>
+<p id="traffic">0 packets</p>
+<canvas id="trafficChart"></canvas>
+</div>
+
+<div class="card">
+<h3>Dataset Analysis</h3>
+<input type="file" id="dataset">
+<button onclick="uploadDataset()">Analyze</button>
+<button onclick="downloadReport()">Download Report</button>
+</div>
+
+</div>
+
+<div class="section">
+<h2>Live Events</h2>
+<table>
+<thead>
+<tr>
+<th>Time</th>
+<th>Status</th>
+<th>Risk</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody id="events"></tbody>
+</table>
+</div>
+
+<div class="section">
+<h2>Global Threat Heatmap</h2>
+<div id="map"></div>
+</div>
+
+<div class="section">
+<h2>SHAP Feature Impact</h2>
+<canvas id="shapChart"></canvas>
+</div>
+
+<audio id="alarm" src="https://www.soundjay.com/buttons/beep-07.wav"></audio>
+
+<script src="/static/script.js"></script>
+
 </body>
 </html>
