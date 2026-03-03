@@ -1,51 +1,26 @@
 import random
 import time
 import threading
-import sqlite3
 import os
 import requests
 import pandas as pd
 import shap
 import joblib
-import secrets
 
-from fastapi import FastAPI, Form, UploadFile, File, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import JSONResponse, FileResponse, RedirectResponse, HTMLResponse
+from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 app = FastAPI()
 
-# Static folder
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Templates
-templates = Jinja2Templates(directory="static")
-
-# ---------------- CONFIG ----------------
-ADMIN_USER = "admin"
-ADMIN_PASS = "soc123"
-SESSION_TIMEOUT = 1800
+# Serve static folder directly
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 MODEL_PATH = "final_binary_pipeline.pkl"
 model = joblib.load(MODEL_PATH) if os.path.exists(MODEL_PATH) else None
 
-# ---------------- DATABASE ----------------
-conn = sqlite3.connect("events.db", check_same_thread=False)
-cur = conn.cursor()
-cur.execute("""
-CREATE TABLE IF NOT EXISTS logs(
-time TEXT,
-status TEXT,
-risk INTEGER,
-severity TEXT
-)
-""")
-conn.commit()
-
-# ---------------- STATE ----------------
 state = {
     "traffic": 0,
     "risk": 0,
@@ -55,8 +30,6 @@ state = {
     "shap_data": [],
     "traffic_history": []
 }
-
-clients = set()
 
 # ---------------- SIMULATION ----------------
 
@@ -120,21 +93,7 @@ def simulate():
 
 threading.Thread(target=simulate, daemon=True).start()
 
-# ---------------- ROUTES ----------------
-
-@app.get("/", response_class=HTMLResponse)
-def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
-@app.post("/login")
-def login(username: str = Form(...), password: str = Form(...)):
-    if username == ADMIN_USER and password == ADMIN_PASS:
-        return RedirectResponse("/dashboard", status_code=302)
-    return RedirectResponse("/", status_code=302)
-
-@app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+# ---------------- API ----------------
 
 @app.get("/api/data")
 def data():
