@@ -8,4 +8,6 @@ shap
 reportlab
 python-multipart
 requests
+jinja2
+
 
