@@ -1,31 +1,49 @@
+const socket = new WebSocket(
+(location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws"
+);
+
 const map = L.map('map').setView([20,0],2);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-maxZoom:18
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let heatLayer = L.heatLayer([], {
+radius: 30,
+blur: 25,
+maxZoom: 5
 }).addTo(map);
 
-async function update(){
-const res = await fetch('/api/data');
-const data = await res.json();
+let trafficChart = null;
+let shapChart = null;
 
-document.getElementById("traffic").innerText =
-data.traffic + " packets";
+socket.onopen = function(){
+setInterval(() => socket.send("update"), 15000);
+};
 
-document.getElementById("risk").innerText =
-data.risk + "%";
+socket.onmessage = function(event){
+const data = JSON.parse(event.data);
+updateUI(data);
+};
 
-document.getElementById("bar").style.width =
-data.risk + "%";
+function updateUI(data){
 
-document.getElementById("threat").innerText =
-data.threat_level;
+// Basic stats
+document.getElementById("traffic").innerText = data.traffic + " packets";
+document.getElementById("risk").innerText = data.risk + "%";
+document.getElementById("bar").style.width = data.risk + "%";
+document.getElementById("threat").innerText = data.threat_level;
 
+// Alarm
+if(data.threat_level === "HIGH" || data.threat_level === "CRITICAL"){
+document.getElementById("alarm").play();
+}
+
+// Events table
 const tbody = document.getElementById("events");
 tbody.innerHTML = "";
 
-data.events.forEach(e=>{
-tbody.innerHTML +=
-`<tr>
+data.events.forEach(e => {
+tbody.innerHTML += `
+<tr>
 <td>${e.time}</td>
 <td>${e.status}</td>
 <td>${e.risk}</td>
@@ -33,13 +51,73 @@ tbody.innerHTML +=
 </tr>`;
 });
 
-data.geo.forEach(g=>{
-L.circleMarker([g.lat,g.lon],{
-radius:5,
-color:'red'
-}).addTo(map);
+// Heatmap
+const heatPoints = data.geo.map(g => [g.lat, g.lon, g.intensity]);
+heatLayer.setLatLngs(heatPoints);
+
+// Traffic chart
+if(trafficChart) trafficChart.destroy();
+
+trafficChart = new Chart(document.getElementById("trafficChart"), {
+type: 'line',
+data: {
+labels: data.traffic_history.map((_,i)=>i+1),
+datasets: [{
+label: "Traffic",
+data: data.traffic_history,
+borderColor: "#00f2ff",
+borderWidth: 2,
+fill: false
+}]
+},
+options: {
+responsive: true,
+plugins: { legend: { display: false } }
+}
+});
+
+// SHAP chart
+if(data.shap_data && data.shap_data.length > 0){
+
+if(shapChart) shapChart.destroy();
+
+shapChart = new Chart(document.getElementById("shapChart"), {
+type: 'bar',
+data: {
+labels: ["F1","F2","F3","F4","F5"],
+datasets: [{
+label: "Feature Impact",
+data: data.shap_data,
+backgroundColor: "#00f2ff"
+}]
+},
+options: {
+responsive: true
+}
 });
 }
 
-update();
-setInterval(update,15000);
+}
+
+// Theme toggle
+function toggleTheme(){
+document.body.classList.toggle("light");
+}
+
+// Dataset upload
+async function uploadDataset(){
+const file = document.getElementById("dataset").files[0];
+if(!file){
+alert("Please select a dataset.");
+return;
+}
+const form = new FormData();
+form.append("file", file);
+await fetch('/api/upload', { method:'POST', body:form });
+alert("Dataset analyzed successfully");
+}
+
+// Download report
+function downloadReport(){
+window.open('/api/report');
+}
