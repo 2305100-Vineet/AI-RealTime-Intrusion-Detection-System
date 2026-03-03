@@ -1,192 +1,65 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import joblib
-import numpy as np
-import sqlite3
-import threading
-import time
 import random
-import os
-import secrets
-
-# ==============================
-# APP INIT
-# ==============================
+import time
+import threading
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Detect Cloud (Render sets PORT automatically)
-CLOUD_MODE = os.getenv("RENDER") == "true"
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
-# ==============================
-# LOGIN CONFIG
-# ==============================
+# ---- Global State ----
+state = {
+    "traffic": 0,
+    "risk": 0,
+    "threat_level": "LOW",
+    "events": [],
+    "geo": []
+}
 
-security = HTTPBasic()
-USERNAME = "admin"
-PASSWORD = "soc123"
-
-def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
-    correct_user = secrets.compare_digest(credentials.username, USERNAME)
-    correct_pass = secrets.compare_digest(credentials.password, PASSWORD)
-    if not (correct_user and correct_pass):
-        raise HTTPException(status_code=401)
-    return credentials.username
-
-@app.get("/")
-def login_page():
-    return FileResponse("static/login.html")
-
-@app.get("/dashboard")
-def dashboard(user: str = Depends(authenticate)):
-    return FileResponse("static/index.html")
-
-# ==============================
-# LOAD MODEL
-# ==============================
-
-binary_pipeline = joblib.load("final_binary_pipeline.pkl")
-
-# ==============================
-# DATABASE INIT
-# ==============================
-
-def init_db():
-    conn = sqlite3.connect("threat.db")
-    c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT,
-        status TEXT,
-        risk INTEGER,
-        severity TEXT,
-        ip TEXT
-    )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# ==============================
-# LIVE IDS VARIABLES
-# ==============================
-
-packet_count = 0
-total_packet_size = 0
-live_mode = False
-clients = []
-
-# ==============================
-# REAL PACKET SNIFFING (LOCAL ONLY)
-# ==============================
-
-if not CLOUD_MODE:
-    from scapy.all import sniff
-
-    def process_packet(packet):
-        global packet_count, total_packet_size
-        packet_count += 1
-        total_packet_size += len(packet)
-
-    def sniff_thread():
-        sniff(prn=process_packet, store=False)
-
-    threading.Thread(target=sniff_thread, daemon=True).start()
-
-# ==============================
-# ANALYZER LOOP (15 sec)
-# ==============================
-
-def analyzer_loop():
-    global packet_count, total_packet_size
-
+def simulate_traffic():
     while True:
-        time.sleep(15)
+        traffic = random.randint(20, 120)
+        attack_chance = random.randint(1, 100)
 
-        if not live_mode:
-            continue
-
-        if CLOUD_MODE:
-            packet_sim = random.randint(50, 500)
-            avg_size = random.randint(200, 1500)
+        if attack_chance > 80:
+            risk = random.randint(60, 95)
+            threat = "HIGH"
+            event_type = "Attack Detected"
+        elif attack_chance > 50:
+            risk = random.randint(30, 60)
+            threat = "MEDIUM"
+            event_type = "Suspicious Activity"
         else:
-            if packet_count == 0:
-                continue
-            packet_sim = packet_count
-            avg_size = total_packet_size / packet_count
+            risk = random.randint(5, 25)
+            threat = "LOW"
+            event_type = "Normal Traffic"
 
-        # 40 feature vector
-        features = np.zeros(40)
-        features[0] = packet_sim
-        features[1] = avg_size
-        features = features.reshape(1, -1)
-
-        prob = binary_pipeline.predict_proba(features)[0][1]
-        risk_score = int(prob * 100)
-        is_attack = prob > 0.5
-
-        severity = "Low"
-        if risk_score > 70:
-            severity = "High"
-        elif risk_score > 40:
-            severity = "Medium"
-
-        ip = f"192.168.1.{random.randint(1,255)}"
-
-        result = {
-            "status": "attack" if is_attack else "safe",
-            "risk_score": risk_score,
-            "severity": severity,
-            "ip": ip
+        geo_point = {
+            "lat": random.uniform(-60, 60),
+            "lon": random.uniform(-180, 180)
         }
 
-        # Save to DB
-        conn = sqlite3.connect("threat.db")
-        c = conn.cursor()
-        c.execute("INSERT INTO logs (timestamp,status,risk,severity,ip) VALUES (datetime('now'),?,?,?,?)",
-                  (result["status"], risk_score, severity, ip))
-        conn.commit()
-        conn.close()
+        state["traffic"] = traffic
+        state["risk"] = risk
+        state["threat_level"] = threat
+        state["geo"].append(geo_point)
 
-        # Reset counters
-        packet_count = 0
-        total_packet_size = 0
+        state["events"].insert(0, {
+            "time": time.strftime("%H:%M:%S"),
+            "status": event_type,
+            "risk": risk,
+            "severity": threat
+        })
 
-        # Push to WebSocket clients
-        for client in clients:
-            try:
-                import asyncio
-                asyncio.run(client.send_json(result))
-            except:
-                pass
+        state["events"] = state["events"][:10]
+        state["geo"] = state["geo"][-20:]
 
-threading.Thread(target=analyzer_loop, daemon=True).start()
+        time.sleep(15)
 
-# ==============================
-# WEBSOCKET
-# ==============================
+threading.Thread(target=simulate_traffic, daemon=True).start()
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    clients.append(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        clients.remove(websocket)
-
-# ==============================
-# TOGGLE LIVE MODE
-# ==============================
-
-@app.post("/toggle_live")
-def toggle_live():
-    global live_mode
-    live_mode = not live_mode
-    return {"live_mode": live_mode}
+@app.get("/api/data")
+def get_data():
+    return JSONResponse(state)
