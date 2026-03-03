@@ -1,34 +1,45 @@
-const socket = new WebSocket("ws://"+location.host+"/ws");
+const map = L.map('map').setView([20,0],2);
 
-socket.onmessage = function(event){
-const data = JSON.parse(event.data);
-updateUI(data);
-addLog(data);
-updateMap(data);
-};
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:18
+}).addTo(map);
 
-function updateUI(data){
-document.getElementById("status").innerText=data.status;
-document.getElementById("riskPercent").innerText=data.risk_score+"%";
-}
+async function update(){
+const res = await fetch('/api/data');
+const data = await res.json();
 
-function addLog(data){
-let table=document.getElementById("logTable");
-let row=table.insertRow(0);
-row.insertCell(0).innerText=new Date().toLocaleTimeString();
-row.insertCell(1).innerText=data.status;
-row.insertCell(2).innerText=data.risk_score+"%";
-row.insertCell(3).innerText=data.severity;
-row.insertCell(4).innerText=data.ip;
-}
+document.getElementById("traffic").innerText =
+data.traffic + " packets";
 
-function updateMap(data){
-if(data.risk_score>50){
-worldMap.data.datasets[0].data.push({
-x:Math.random()*360-180,
-y:Math.random()*180-90,
-r:5
+document.getElementById("risk").innerText =
+data.risk + "%";
+
+document.getElementById("bar").style.width =
+data.risk + "%";
+
+document.getElementById("threat").innerText =
+data.threat_level;
+
+const tbody = document.getElementById("events");
+tbody.innerHTML = "";
+
+data.events.forEach(e=>{
+tbody.innerHTML +=
+`<tr>
+<td>${e.time}</td>
+<td>${e.status}</td>
+<td>${e.risk}</td>
+<td>${e.severity}</td>
+</tr>`;
 });
-worldMap.update();
+
+data.geo.forEach(g=>{
+L.circleMarker([g.lat,g.lon],{
+radius:5,
+color:'red'
+}).addTo(map);
+});
 }
-}
+
+update();
+setInterval(update,15000);
