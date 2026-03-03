@@ -1,5 +1,11 @@
 fastapi
 uvicorn
 numpy
+pandas
 joblib
 scikit-learn
+shap
+reportlab
+python-multipart
+requests
+
