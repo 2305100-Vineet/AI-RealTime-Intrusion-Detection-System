@@ -26,13 +26,13 @@ updateUI(data);
 
 function updateUI(data){
 
-// Basic stats
+// Basic metrics
 document.getElementById("traffic").innerText = data.traffic + " packets";
 document.getElementById("risk").innerText = data.risk + "%";
 document.getElementById("bar").style.width = data.risk + "%";
 document.getElementById("threat").innerText = data.threat_level;
 
-// Alarm
+// Alarm for high threat
 if(data.threat_level === "HIGH" || data.threat_level === "CRITICAL"){
 document.getElementById("alarm").play();
 }
@@ -55,7 +55,7 @@ tbody.innerHTML += `
 const heatPoints = data.geo.map(g => [g.lat, g.lon, g.intensity]);
 heatLayer.setLatLngs(heatPoints);
 
-// Traffic chart
+// Traffic Chart
 if(trafficChart) trafficChart.destroy();
 
 trafficChart = new Chart(document.getElementById("trafficChart"), {
@@ -76,7 +76,7 @@ plugins: { legend: { display: false } }
 }
 });
 
-// SHAP chart
+// SHAP Chart
 if(data.shap_data && data.shap_data.length > 0){
 
 if(shapChart) shapChart.destroy();
@@ -99,25 +99,25 @@ responsive: true
 
 }
 
-// Theme toggle
+// Theme Toggle
 function toggleTheme(){
 document.body.classList.toggle("light");
 }
 
-// Dataset upload
+// Dataset Upload
 async function uploadDataset(){
 const file = document.getElementById("dataset").files[0];
 if(!file){
-alert("Please select a dataset.");
+alert("Select dataset first.");
 return;
 }
 const form = new FormData();
 form.append("file", file);
 await fetch('/api/upload', { method:'POST', body:form });
-alert("Dataset analyzed successfully");
+alert("Dataset analyzed.");
 }
 
-// Download report
+// PDF Download
 function downloadReport(){
 window.open('/api/report');
 }
