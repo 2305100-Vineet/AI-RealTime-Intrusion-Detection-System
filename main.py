@@ -7,21 +7,21 @@ import pandas as pd
 import shap
 import joblib
 
-from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
+from fastapi import FastAPI, Form, UploadFile, File, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 app = FastAPI()
 
-# ✅ Mount static folder properly
+# Static folder
 app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="static")
 
-# ✅ Root route
-@app.get("/")
-def root():
-    return RedirectResponse(url="/static/index.html")
+ADMIN_USER = "admin"
+ADMIN_PASS = "soc123"
 
 MODEL_PATH = "final_binary_pipeline.pkl"
 model = joblib.load(MODEL_PATH) if os.path.exists(MODEL_PATH) else None
@@ -98,7 +98,21 @@ def simulate():
 
 threading.Thread(target=simulate, daemon=True).start()
 
-# ---------------- API ----------------
+# ---------------- ROUTES ----------------
+
+@app.get("/", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login")
+def login(username: str = Form(...), password: str = Form(...)):
+    if username == ADMIN_USER and password == ADMIN_PASS:
+        return RedirectResponse("/dashboard", status_code=302)
+    return RedirectResponse("/", status_code=302)
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/api/data")
 def data():
@@ -118,15 +132,12 @@ async def websocket_endpoint(websocket: WebSocket):
 async def upload(file: UploadFile = File(...)):
     if model is None:
         return {"error": "Model missing"}
-
     df = pd.read_csv(file.file)
     preds = model.predict(df)
     result = "Intrusion" if sum(preds) > len(preds) / 2 else "Normal"
-
     explainer = shap.Explainer(model)
     shap_values = explainer(df)
     state["shap_data"] = shap_values.values[0].tolist()[:5]
-
     return {"result": result}
 
 @app.get("/api/report")
