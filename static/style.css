@@ -1,68 +1,130 @@
-body {
+body{
 margin:0;
 font-family:Arial;
-background:#0b1a2f;
+background:#0b1220;
 color:white;
 padding:20px;
 }
 
-h1 {
-text-align:center;
-margin-bottom:20px;
+/* Animated Grid */
+.bg-grid{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background-image:
+linear-gradient(#00f2ff22 1px, transparent 1px),
+linear-gradient(90deg,#00f2ff22 1px, transparent 1px);
+background-size:40px 40px;
+animation:move 12s linear infinite;
+z-index:-1;
 }
 
-.grid {
+@keyframes move{
+0%{background-position:0 0;}
+100%{background-position:40px 40px;}
+}
+
+/* Radar */
+.radar{
+width:200px;
+height:200px;
+margin:20px auto;
+border-radius:50%;
+border:2px solid #00f2ff;
+position:relative;
+overflow:hidden;
+}
+
+.radar::after{
+content:"";
+position:absolute;
+width:100%;
+height:100%;
+background:conic-gradient(#00f2ff88 0deg,transparent 60deg);
+animation:rotate 3s linear infinite;
+}
+
+@keyframes rotate{
+from{transform:rotate(0deg);}
+to{transform:rotate(360deg);}
+}
+
+/* Layout */
+.grid{
 display:grid;
 grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
 gap:20px;
 }
 
-.card {
-background:#122a4a;
+.card,.section{
+background:rgba(18,42,74,0.7);
+backdrop-filter:blur(10px);
 padding:20px;
-border-radius:10px;
+border-radius:15px;
 box-shadow:0 0 15px #00f2ff44;
-text-align:center;
+margin-top:20px;
 }
 
-.progress {
-width:100%;
+.progress{
 height:15px;
 background:#222;
 border-radius:10px;
 margin-top:10px;
 }
 
-#bar {
+#bar{
 height:15px;
 width:0%;
 background:#00f2ff;
 border-radius:10px;
+transition:0.5s;
 }
 
-.section {
-margin-top:30px;
-background:#122a4a;
-padding:20px;
-border-radius:10px;
-box-shadow:0 0 15px #00f2ff44;
-}
-
-table {
+table{
 width:100%;
 border-collapse:collapse;
 }
 
-th,td {
+th,td{
 padding:8px;
 text-align:center;
 }
 
-#map {
+#map{
 height:300px;
 border-radius:10px;
+margin-top:10px;
 }
 
+button{
+padding:8px 12px;
+background:#00f2ff;
+border:none;
+border-radius:6px;
+cursor:pointer;
+margin-top:5px;
+}
+
+canvas{
+max-width:100%;
+margin-top:10px;
+}
+
+/* Light Mode */
+.light{
+background:white;
+color:black;
+}
+
+.light .card,
+.light .section{
+background:#f0f0f0;
+color:black;
+}
+
+/* Responsive */
 @media(max-width:600px){
-h1{font-size:18px;}
+button{width:100%;}
 }
